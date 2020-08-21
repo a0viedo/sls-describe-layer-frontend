@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta name="description" content="Describe an AWS Lambda layer">
+    <meta name="og:title" content="Describe an AWS Lambda layer">
+    <meta name="og:description"
+        content="Tool to inspect and review contents of an AWS layer">
+    <meta name="og:type" content="website">
+    <meta name="og:url" content="https://describeawslayer.com">
+    <meta name="twitter:site" content="@a0viedo">
+    <meta name="twitter:title" content="Describe an AWS Lambda layer">
+    <meta name="twitter:description"
+        content="Tool to inspect and review contents of an AWS layer">
+    <title>Describe an AWS Lambda layer</title>
+    <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+    <style type="text/css">
+        .lds-ellipsis {
+            display: inline-block;
+            position: relative;
+            width: 80px;
+            height: 80px;
+        }
+
+        .lds-ellipsis div {
+            position: absolute;
+            top: 33px;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: #555;
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+
+        .lds-ellipsis div:nth-child(1) {
+            left: 8px;
+            animation: lds-ellipsis1 0.6s infinite;
+        }
+
+        .lds-ellipsis div:nth-child(2) {
+            left: 8px;
+            animation: lds-ellipsis2 0.6s infinite;
+        }
+
+        .lds-ellipsis div:nth-child(3) {
+            left: 32px;
+            animation: lds-ellipsis2 0.6s infinite;
+        }
+
+        .lds-ellipsis div:nth-child(4) {
+            left: 56px;
+            animation: lds-ellipsis3 0.6s infinite;
+        }
+
+        @keyframes lds-ellipsis1 {
+            0% {
+                transform: scale(0);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes lds-ellipsis3 {
+            0% {
+                transform: scale(1);
+            }
+
+            100% {
+                transform: scale(0);
+            }
+        }
+
+        @keyframes lds-ellipsis2 {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(24px, 0);
+            }
+        }
+
+        a {
+            color: #4299e1;
+        }
+    </style>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-36283546-5"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'UA-36283546-5');
+    </script>
+
+</head>
+
+<body>
+    <div class="flex flex-col h-screen justify-between">
+        <main class="mb-auto">
+            <div class="flex flex-col justify-center items-center mt-8" id="container">
+                <div class="w-1/4 text-lg">
+                    Enter an ARN:
+                </div>
+                <div class="flexbox-row pb-4 w-1/4">
+                    <input
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-center"
+                        placeholder="arn:aws:lambda:us-east-1:034541671702:layer:openssl-lambda:1" type="text"
+                        id="arn-input" name="lname">
+                </div>
+                <div id="loading" class="hidden">
+                    <div class="lds-ellipsis">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                </div>
+                <div id="error-container" class="hidden">
+                    <p class="text-red-600"></p>
+                </div>
+                <div>
+                    <button id="download-btn"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded inline-flex items-center hidden">
+                        <svg class="fill-current w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            <path d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z" /></svg>
+                        <span>Download .zip</span>
+                    </button>
+                </div>
+                <div class="mb-16 mt-10">
+                    <table id="directory-table" class="shadow-lg w-full bg-white invisible">
+                        <thead>
+                            <tr>
+                                <th class="bg-gray-100 border text-left text-xs px-2 py-1">File</th>
+                                <th class="bg-gray-100 border text-left text-xs px-2 py-1">Size</th>
+                                <th class="bg-gray-100 border text-left text-xs px-2 py-1">Last modified</th>
+                                <th class="bg-gray-100 border text-left text-xs px-2 py-1">Permissions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                        </tbody>
+                    </table>
+
+                </div>
+            </div>
+        </main>
+        <footer class="h-10 flex flex-col justify-center items-center"><span>© 2020 <a target="_blank"
+                    href="https://twitter.com/a0viedo">@a0viedo</a></span></footer>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const input = document.querySelector('#arn-input');
+            const state = {};
+            input.addEventListener('input', async (event) => {
+                console.log(input.value);
+                if (!isValidARN(input.value)) {
+                    return;
+                }
+                await fillTable(input.value, state);
+            });
+
+            const downloadBtn = document.querySelector('#download-btn');
+            downloadBtn.addEventListener('click', async () => {
+                if (state.downloadUrl) {
+                    try {
+                        const fileName = `${input.value.split(':')[6]}.zip`;
+                        await downloadFile(`https://cors-anywhere.herokuapp.com/${state.downloadUrl}`, fileName);
+                    } catch (err) {
+                        // handle couldn't download
+                    }
+                }
+            });
+        }, false);
+
+        function isValidARN(str) {
+            return str.split(':').length === 8;
+        }
+
+        function cleanTable(table) {
+            const tbody = table.querySelector('tbody');
+            tbody.innerHTML = '';
+        }
+
+        async function fillTable(arn, state) {
+            const table = document.querySelector('#directory-table');
+            table.classList.add('invisible');
+            cleanTable(table);
+            document.querySelector('#download-btn').classList.add('hidden');
+            document.querySelector('#error-container').classList.add('hidden');
+
+            document.querySelector('#loading').classList.remove('hidden');
+            const response = await getLayerInfo(arn);
+            if (response.error) {
+                console.log('there was an error', response.message);
+                document.querySelector('#error-container p').innerHTML = response.message;
+                document.querySelector('#error-container').classList.remove('hidden');
+                document.querySelector('#loading').classList.add('hidden');
+                return;
+            }
+            document.querySelector('#loading').classList.add('hidden');
+            state.downloadUrl = response.url;
+            const trs = response.files.reverse().map(value => {
+                const tr = document.createElement('tr');
+
+                tr.innerHTML = `<tr>
+                    <td class="border px-2 py-1 text-xs">${value[0]}</td>
+                    <td class="border px-2 py-1 text-xs text-right" title="${value[1]} bytes">${formatBytes(value[1])}</td>
+                    <td class="border px-2 py-1 text-xs">${value[2]}</td>
+                    <td class="border px-2 py-1 text-xs">${value[3]}</td>
+                </tr>`;
+                return tr;
+            });
+            table.querySelector('tbody').append(...trs);
+            table.classList.remove('invisible');
+            document.querySelector('#download-btn').classList.remove('hidden');
+        }
+
+        function formatBytes(a, b = 2) { if (0 === a) return "0 Bytes"; const c = 0 > b ? 0 : b, d = Math.floor(Math.log(a) / Math.log(1024)); return parseFloat((a / Math.pow(1024, d)).toFixed(c)) + "" + ["bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"][d] }
+
+        async function getLayerInfo(arn) {
+            try {
+                const url = new URL('https://cd6bvwk330.execute-api.us-east-1.amazonaws.com/dev/describe');
+                url.search = new URLSearchParams({ arn });
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                return response.json();
+            } catch (err) {
+                return {
+                    error: 500,
+                    message: 'Internal server error'
+                }
+            }
+        }
+
+        async function downloadFile(url, fileName) {
+            const response = await fetch(url, {
+                method: 'GET',
+                mode: 'cors'
+            });
+            const blob = await response.blob();
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+    </script>
+</body>
+
+</html>
