@@ -159,6 +159,9 @@
             input.focus();
             input.select();
             const state = {};
+            input.addEventListener('click', function() {
+                this.setSelectionRange(0, this.value.length)
+            });
             input.addEventListener('input', async (event) => {
                 console.log(input.value);
                 if (!isValidARN(input.value)) {
