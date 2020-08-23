@@ -225,7 +225,7 @@
 
         async function getLayerInfo(arn) {
             try {
-                const url = new URL('https://cd6bvwk330.execute-api.us-east-1.amazonaws.com/dev/describe');
+                const url = new URL('https://api.describeawslayer.com');
                 url.search = new URLSearchParams({ arn });
                 const response = await fetch(url, {
                     method: 'GET',
